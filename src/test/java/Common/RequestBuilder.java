@@ -11,12 +11,9 @@ import org.testng.annotations.Test;
 import static Common.BasePaths.*;
 import static Common.CommonTestData.Bad_Request_Status_Code;
 import static Common.ContentTypes.json_contentType;
-import static Common.PayloadBuilder.*;
 import static io.restassured.RestAssured.given;
 
 public class RequestBuilder {
-    public static String stationID;
-    public static String UserID;
 
     public static Response getListOfAllCountriesResponse() {
         return given().
