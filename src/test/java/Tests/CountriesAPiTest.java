@@ -1,166 +1,115 @@
 package Tests;
 
-import Common.BasePaths;
+import Common.RequestBuilder;
+import Utils.ReadProperties;
 import io.qameta.allure.*;
-import io.qameta.allure.internal.shadowed.jackson.databind.JsonSerializable;
-import io.qameta.allure.internal.shadowed.jackson.databind.jsonschema.JsonSchema;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import org.testng.asserts.SoftAssert;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
-import static Common.CommonTestData.Success_Status_Code;
-import static Common.RequestBuilder.getListOfAllCountriesResponse;
+import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
-@Test
-@Feature("Countries API")
-@Story("Get list of allcountries")
-public class CountriesAPiTest extends BasePaths {
 
-    @Description("As a map builder i want to get the list of all countries")
-    @Severity(SeverityLevel.CRITICAL)
-    public void getListOfAllCountriesTest() {
-        getListOfAllCountriesResponse().
-                then().
-                assertThat().
-                statusCode(Success_Status_Code);
-//                body(containsString("body")).
+public class CountriesAPiTest {
 
-    }
-
-    @Description("As an API user I want to ensure that the data returned from the API conforms to published schema\n" +
-            "so that my application can reliably consume and process the data returned")
-    @Severity(SeverityLevel.CRITICAL)
-
-
-    public void testCountriesSchemaValidation() throws Exception {
-        // API endpoint to retrieve all countries
-        String url = BaseURL + "/v3.1/all/";
-
-        // Create an HTTP client
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet request = new HttpGet(url);
-            HttpResponse response = client.execute(request);
-
-            // Check if the response status code is 200 (OK)
-            Assert.assertEquals("Expected status code 200",  response.getStatusLine().getStatusCode());
-
-            // Read the JSON response
-            BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-            StringBuilder jsonResponse = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                jsonResponse.append(line);
-            }
-            reader.close();
-
-            // Load the JSON schema from a file
-            String schemaPath = "path/to/countries-schema.json"; // Replace with the path to your schema file
-            String schema = new String(Files.readAllBytes(Paths.get(schemaPath)));
-
-            // Validate the JSON response against the schema
-            JsonSchemaFactory factory = JsonSchemaFactory.byDefault();
-            JsonSchema jsonSchema = factory.getJsonSchema(schema);
-
-        }
-
+    @BeforeClass
+    public void setup() {
+        RestAssured.baseURI = ReadProperties.getBaseUrl();
     }
 
 
-    @Description("As a map builder i want to confirm number of countries")
-    @Severity(SeverityLevel.CRITICAL)
-
-    public void confirmNumberOfCountries() throws Exception {
-        // API endpoint to retrieve all countries
-        String url = BaseURL + "/v3.1/all/";
-
-        // Create an HTTP client
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet request = new HttpGet(url);
-            HttpResponse response = client.execute(request);
-
-            // Check if the response status code is 200 (OK)
-            Assert.assertEquals("Expected status code 200", response.getStatusLine().getStatusCode());
-
-            // Read the JSON response
-            BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-            StringBuilder jsonResponse = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                jsonResponse.append(line);
-            }
-            reader.close();
-
-            // Parse the JSON response to count the number of countries
-            String json = jsonResponse.toString();
-            int numberOfCountries = json.split("\\{").length - 1; // Count the number of countries
-
-            // Assert that there are 195 countries
-            Assert.assertEquals("Expected number of countries to be 195", numberOfCountries);
-            System.out.println("Number of countries in the world: " + numberOfCountries);
-
-        }
-
-
+    @Test
+    public void GetAllCountriesTests() {
+        given()
+                .when()
+                .get(ReadProperties.getEndpoint())
+                .then()
+                .statusCode(200)
+                .body("size()", greaterThan(0));
     }
 
-    @Description("As a map builder i want to validate SASL as an official language")
-    @Severity(SeverityLevel.CRITICAL)
-    public void validateSaslRecognition() throws Exception {
-        // API endpoint to check the status of SASL
-        String url = BaseURL + "/v3.1/all/";
 
-        // Create an HTTP client
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet request = new HttpGet(url);
-            HttpResponse response = client.execute(request);
+    @Test(priority = 1)
+    public void SchemaValidationTests() {
+        // Get the response from the API
+        Response response = RequestBuilder.getAllCountries();
 
-            // Check if the response status code is 200 (OK)
-            Assert.assertEquals("Expected status code 200", response.getStatusLine().getStatusCode());
+        // Verify response status code is 200
+        Assert.assertEquals(200, response.getStatusCode());
 
-            // Read the JSON response
-            BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-            StringBuilder jsonResponse = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                jsonResponse.append(line);
-            }
-            reader.close();
-
-            // Parse the JSON response (assuming a simple JSON structure)
-            String json = jsonResponse.toString();
-            //Assert.assertTrue("SASL should be recognized as an official SA language", json.contains("SASL"));
-
-
-            // Print the JSON response for debugging
-            System.out.println("Response: " + json);
-        }
+        // Validate the response against our schema
+        RequestBuilder.validateSchema(response, "src/test/resources/schemas/countries_schema.json");
     }
+
+
+    @Test(priority = 2)
+    public void VerifyCountryDetailsTests() {
+        Response response = given()
+                .when()
+                .get(ReadProperties.getEndpoint())
+                .then()
+                .statusCode(200)
+                .extract().response();
+
+        // Verify that each country has required fields
+        response.then()
+                .body("name.common", everyItem(notNullValue()))
+                .body("capital", everyItem(anyOf(nullValue(), isA(java.util.List.class))))
+                .body("region", everyItem(notNullValue()));
+    }
+
+    @Test(priority = 3)
+    public void ResponseTimeTests() {
+        given()
+                .when()
+                .get(ReadProperties.getEndpoint())
+                .then()
+                .statusCode(200)
+                .time(lessThan(5000L)); // Response time should be less than 5 seconds
+    }
+
+    @Test(priority = 4, description = "Verify total number of countries is 195")
+    public void verifyTotalCountriesCountTests() {
+        int expectedCountries = 195;
+        int actualCountries = RequestBuilder.getTotalCountriesCount();
+
+        SoftAssert softAssert = new SoftAssert();
+        softAssert.assertEquals(actualCountries, expectedCountries,
+                "Expected " + expectedCountries + " countries but found " + actualCountries);
+
+        // Print test report
+        System.out.println("\n=== Countries Count Test Report ===");
+        System.out.println("Expected number of countries: " + expectedCountries);
+        System.out.println("Actual number of countries: " + actualCountries);
+        System.out.println("Test Status: " + (actualCountries == expectedCountries ? "PASSED" : "FAILED"));
+
+        softAssert.assertAll();
+    }
+
+    @Test(priority = 5, description = "Verify South African Sign Language (SASL) is included in official languages")
+    public void verifySouthAfricanLanguagesTests() {
+        Object languages = RequestBuilder.getSouthAfricanLanguages();
+        String languagesStr = languages.toString().toLowerCase();
+
+        SoftAssert softAssert = new SoftAssert();
+        softAssert.assertTrue(languagesStr.contains("sasl") || languagesStr.contains("sign language"),
+                "South African Sign Language (SASL) is not listed in official languages");
+
+        // Print test report
+        System.out.println("\n=== South African Languages Test Report ===");
+        System.out.println("Retrieved languages: " + languages);
+        System.out.println("SASL Status: " + (languagesStr.contains("sasl") ? "INCLUDED" : "NOT INCLUDED"));
+        System.out.println("Test Status: " + (languagesStr.contains("sasl") ? "PASSED" : "FAILED"));
+
+        softAssert.assertAll();
+    }
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
