@@ -32,5 +32,3 @@ The below shows different way to trigger the pipeline build
 * push something to the main branch - the build will  be triggered automatically
 * trigger the build direct from github actions
 
-## Report in the pipeline
-* Open the 
