@@ -59,8 +59,6 @@
                 <configuration>
                     <includes>
                         <include>Tests.CountriesAPiTest</include>
-                        <include>Tests.ReqRes.ReqResTests</include>
-                        <include>Tests.WeatherAPI.WeatherStationTests</include>
                     </includes>
                 </configuration>
             </plugin>

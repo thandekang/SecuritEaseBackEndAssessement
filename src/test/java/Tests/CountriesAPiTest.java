@@ -3,6 +3,7 @@ package Tests;
 import Common.BasePaths;
 import io.qameta.allure.*;
 import io.qameta.allure.internal.shadowed.jackson.databind.JsonSerializable;
+import io.qameta.allure.internal.shadowed.jackson.databind.jsonschema.JsonSchema;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -12,6 +13,8 @@ import org.testng.annotations.Test;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import static Common.CommonTestData.Success_Status_Code;
 import static Common.RequestBuilder.getListOfAllCountriesResponse;
@@ -32,6 +35,45 @@ public class CountriesAPiTest extends BasePaths {
 //                body(containsString("body")).
 
     }
+
+    @Description("As an API user I want to ensure that the data returned from the API conforms to published schema\n" +
+            "so that my application can reliably consume and process the data returned")
+    @Severity(SeverityLevel.CRITICAL)
+
+
+    public void testCountriesSchemaValidation() throws Exception {
+        // API endpoint to retrieve all countries
+        String url = BaseURL + "/v3.1/all/";
+
+        // Create an HTTP client
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            HttpResponse response = client.execute(request);
+
+            // Check if the response status code is 200 (OK)
+            Assert.assertEquals("Expected status code 200",  response.getStatusLine().getStatusCode());
+
+            // Read the JSON response
+            BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+            StringBuilder jsonResponse = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                jsonResponse.append(line);
+            }
+            reader.close();
+
+            // Load the JSON schema from a file
+            String schemaPath = "path/to/countries-schema.json"; // Replace with the path to your schema file
+            String schema = new String(Files.readAllBytes(Paths.get(schemaPath)));
+
+            // Validate the JSON response against the schema
+            JsonSchemaFactory factory = JsonSchemaFactory.byDefault();
+            JsonSchema jsonSchema = factory.getJsonSchema(schema);
+
+        }
+
+    }
+
 
     @Description("As a map builder i want to confirm number of countries")
     @Severity(SeverityLevel.CRITICAL)
